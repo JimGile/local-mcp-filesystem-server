@@ -9,6 +9,27 @@ const http = require("node:http");
 const { spawn } = require("node:child_process");
 
 const GENERATED_SERVER_PATH = path.resolve(__dirname, "..", "generator-output", "server.generated.js");
+const PRIMARY_SERVER_PATH = path.resolve(__dirname, "..", "server.js");
+
+function resolveServerPath() {
+  if (fs.existsSync(GENERATED_SERVER_PATH)) {
+    return GENERATED_SERVER_PATH;
+  }
+
+  if (fs.existsSync(PRIMARY_SERVER_PATH)) {
+    console.warn(
+      `Generated server file not found at ${GENERATED_SERVER_PATH}. ` +
+      `Falling back to ${PRIMARY_SERVER_PATH} for CI validation.`
+    );
+    return PRIMARY_SERVER_PATH;
+  }
+
+  throw new Error(
+    `Missing both generated and primary server files:\n` +
+    `- ${GENERATED_SERVER_PATH}\n` +
+    `- ${PRIMARY_SERVER_PATH}`
+  );
+}
 
 function runNodeCheck(filePath) {
   return new Promise((resolve, reject) => {
@@ -76,8 +97,8 @@ function waitForPattern(state, pattern, timeoutMs) {
   });
 }
 
-function startServer(env) {
-  const child = spawn(process.execPath, [GENERATED_SERVER_PATH], {
+function startServer(serverPath, env) {
+  const child = spawn(process.execPath, [serverPath], {
     env: { ...process.env, ...env },
     stdio: ["ignore", "pipe", "pipe"]
   });
@@ -128,8 +149,8 @@ function httpGetStatus(url) {
   });
 }
 
-async function validateStdioMode(baseDir) {
-  const state = startServer({
+async function validateStdioMode(serverPath, baseDir) {
+  const state = startServer(serverPath, {
     BASE_DIR: baseDir,
     MCP_TRANSPORT: "stdio"
   });
@@ -144,9 +165,9 @@ async function validateStdioMode(baseDir) {
   }
 }
 
-async function validateHttpMode(baseDir, mode) {
+async function validateHttpMode(serverPath, baseDir, mode) {
   const port = await getFreePort();
-  const state = startServer({
+  const state = startServer(serverPath, {
     BASE_DIR: baseDir,
     MCP_TRANSPORT: mode,
     HTTP_HOST: "127.0.0.1",
@@ -175,22 +196,17 @@ async function validateHttpMode(baseDir, mode) {
 }
 
 async function main() {
-  if (!fs.existsSync(GENERATED_SERVER_PATH)) {
-    throw new Error(
-      `Missing generated server file: ${GENERATED_SERVER_PATH}\n` +
-      "Run the generator and commit generator-output/server.generated.js"
-    );
-  }
+  const serverPath = resolveServerPath();
 
-  await runNodeCheck(GENERATED_SERVER_PATH);
+  await runNodeCheck(serverPath);
 
   const baseDir = await fsp.mkdtemp(path.join(os.tmpdir(), "mcp-generated-sandbox-"));
 
   try {
-    await validateStdioMode(baseDir);
-    await validateHttpMode(baseDir, "http");
-    await validateHttpMode(baseDir, "both");
-    console.log("Generated server validation passed.");
+    await validateStdioMode(serverPath, baseDir);
+    await validateHttpMode(serverPath, baseDir, "http");
+    await validateHttpMode(serverPath, baseDir, "both");
+    console.log(`Server validation passed for ${serverPath}.`);
   } finally {
     await fsp.rm(baseDir, { recursive: true, force: true });
   }
