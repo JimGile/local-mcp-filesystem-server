@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+
+<html class="h-full" lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Local MCP Filesystem Server Generator</title>
+<meta content="Generate a secure local MCP server that only reads and writes inside a configured base folder." name="description"/>
+<meta content="Local MCP Filesystem Server Generator" property="og:title"/>
+<meta content="Generate a secure local MCP server that only reads and writes inside a configured base folder." property="og:description"/>
+<meta content="assets/img_64x64_72eabd9c.png" property="og:image"/>
+<meta content="website" property="og:type"/>
+<link href="assets/img_64x64_2ccf3089.png" rel="icon" type="image/png"/>
+<script src="assets/script_fb5d821a.js"></script>
+<link href="assets/style_bb1b9912.css" rel="stylesheet"/>
+<script src="assets/script_897632af.js"></script>
+<link href="assets/style_2f71c461.css" rel="stylesheet"/>
+<script crossorigin="" src="assets/script_65b01c7e.js"></script>
+<style>
+    @font-face {
+      font-family: 'Font Awesome 6 Free';
+      font-path: '/chat/webfonts/fa-regular-400';
+      src: url('/chat/webfonts/fa-regular-400.woff2') format('woff2'),
+          url('/chat/webfonts/fa-regular-400.ttf') format('truetype');
+    }
+    @font-face {
+      font-family: 'Font Awesome 6 Free';
+      font-path: '/chat/webfonts/fa-solid-900';
+      src: url('/chat/webfonts/fa-solid-900.woff2') format('woff2'),
+          url('/chat/webfonts/fa-solid-900.ttf') format('truetype');
+    }
+    @font-face {
+      font-family: 'Font Awesome 6 Brands';
+      font-path: '/chat/webfonts/fa-brands-400';
+      src: url('/chat/webfonts/fa-brands-400.woff2') format('woff2'),
+          url('/chat/webfonts/fa-brands-400.ttf') format('truetype');
+    }
+  </style>
+<script>
+        globalThis.load_data_from_csv = (filename) => {
+                    // Implementation needed when code is downloaded
+                };
+
+        globalThis.save_data_to_csv = (filename, data) => {
+                    // Implementation needed when code is downloaded
+                };
+
+        globalThis.call_llm = (system_prompt, user_messages, json_fields) => {
+                    // Implementation needed when code is downloaded
+                };
+            </script></head>
+<body class="h-full bg-slate-950 text-slate-100">
+<div class="min-h-full">
+<div class="max-w-7xl mx-auto px-4 py-8 md:px-8">
+<div class="flex flex-col gap-6">
+<div class="rounded-2xl border border-slate-800 bg-slate-900/80 shadow-2xl p-6 md:p-8">
+<div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+<div class="max-w-3xl">
+<div class="inline-flex items-center gap-2 rounded-full border border-emerald-700/40 bg-emerald-500/10 px-3 py-1 text-sm text-emerald-300">
+<i aria-hidden="true" class="fas fa-shield-halved"></i>
+<span>Secure Local MCP Server Generator</span>
+</div>
+<h1 class="mt-4 text-3xl md:text-4xl font-bold tracking-tight">Generate a custom MCP filesystem server sandboxed to one base folder</h1>
+<p class="mt-3 text-slate-300 text-base md:text-lg">
+                This generator creates a Node.js MCP server template that only permits filesystem access inside a configured base directory and supports stdio, HTTP, or both transports.
+                It blocks path traversal, resolves symlinks conservatively, and rejects reads or writes outside the sandbox.
+              </p>
+</div>
+<div class="flex items-center justify-center">
+<img alt="Secure folder server dashboard" class="w-full max-w-sm rounded-2xl border border-slate-800 shadow-lg" id="heroImage" src="assets/img_800x600_0b18f255.png"/>
+<div class="hidden w-80 h-56 rounded-2xl border border-slate-700 bg-slate-800/60 flex items-center justify-center text-slate-400" id="heroFallback">
+<div class="text-center">
+<i aria-hidden="true" class="fas fa-folder-tree fa-3x mb-3"></i>
+<div>Preview unavailable</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-1 xl:grid-cols-5 gap-6">
+<div class="xl:col-span-2 rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-xl">
+<div class="flex items-center gap-3 mb-5">
+<i aria-hidden="true" class="fas fa-sliders text-cyan-400"></i>
+<h2 class="text-xl font-semibold">Configuration</h2>
+</div>
+<div class="space-y-5">
+<div>
+<label class="block text-sm font-medium text-slate-300 mb-2" for="serverName">Server name</label>
+<input class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition-all duration-300" id="serverName" placeholder="sandboxed-filesystem-mcp" type="text" value="sandboxed-filesystem-mcp"/>
+</div>
+<div>
+<label class="block text-sm font-medium text-slate-300 mb-2" for="baseFolder">Allowed base folder</label>
+<input class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition-all duration-300" id="baseFolder" placeholder="/absolute/path/to/allowed/base" type="text" value="/absolute/path/to/allowed/base"/>
+<p class="mt-2 text-xs text-slate-400">Use an absolute path. All reads and writes will be restricted to this folder and its descendants.</p>
+</div>
+<div>
+<label class="block text-sm font-medium text-slate-300 mb-2" for="languageMode">Template mode</label>
+<select class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition-all duration-300" id="languageMode">
+<option value="node">Node.js MCP server</option>
+</select>
+</div>
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+<label class="flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 cursor-pointer">
+<input class="h-4 w-4 rounded border-slate-600 bg-slate-900 text-cyan-500" id="allowDelete" type="checkbox"/>
+<span class="text-sm text-slate-300">Include delete tool</span>
+</label>
+<label class="flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 cursor-pointer">
+<input checked="" class="h-4 w-4 rounded border-slate-600 bg-slate-900 text-cyan-500" id="allowMkdir" type="checkbox"/>
+<span class="text-sm text-slate-300">Include mkdir tool</span>
+</label>
+</div>
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+<button class="rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold px-4 py-3 transition-all duration-300 shadow-md hover:shadow-lg" id="generateBtn">
+<i aria-hidden="true" class="fas fa-wand-magic-sparkles mr-2"></i>Generate
+                </button>
+<button class="rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold px-4 py-3 transition-all duration-300 shadow-md hover:shadow-lg" id="saveCsvBtn">
+<i aria-hidden="true" class="fas fa-file-csv mr-2"></i>Save Spec CSV
+                </button>
+</div>
+<div class="hidden rounded-xl border px-4 py-3 text-sm" id="statusBox"></div>
+</div>
+</div>
+<div class="xl:col-span-3 space-y-6">
+<div class="rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-xl">
+<div class="flex items-center justify-between gap-4 flex-wrap">
+<div class="flex items-center gap-3">
+<i aria-hidden="true" class="fas fa-code text-violet-400"></i>
+<h2 class="text-xl font-semibold">Generated MCP server</h2>
+</div>
+<div class="flex gap-3 flex-wrap">
+<button class="rounded-xl border border-slate-700 hover:border-slate-600 bg-slate-950 px-4 py-2 text-sm font-medium transition-all duration-300" id="copyBtn">
+<i aria-hidden="true" class="fas fa-copy mr-2"></i>Copy code
+                  </button>
+<button class="rounded-xl border border-slate-700 hover:border-slate-600 bg-slate-950 px-4 py-2 text-sm font-medium transition-all duration-300" id="downloadBtn">
+<i aria-hidden="true" class="fas fa-download mr-2"></i>Download .js
+                  </button>
+</div>
+</div>
+<pre class="mt-5 rounded-2xl border border-slate-800 bg-slate-950 p-4 overflow-auto text-sm leading-6"><code class="text-slate-200" id="codeOutput"></code></pre>
+</div>
+<div class="rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-xl">
+<div class="flex items-center gap-3 mb-4">
+<i aria-hidden="true" class="fas fa-book text-amber-400"></i>
+<h2 class="text-xl font-semibold">What the generated server does</h2>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-slate-300">
+<div class="rounded-xl border border-slate-800 bg-slate-950 p-4">
+<div class="font-semibold text-slate-100 mb-2">Path sandboxing</div>
+<p>Every requested path is resolved against the configured base directory, normalized, and verified to remain inside the base folder before any file operation is performed.</p>
+</div>
+<div class="rounded-xl border border-slate-800 bg-slate-950 p-4">
+<div class="font-semibold text-slate-100 mb-2">Traversal defense</div>
+<p>Requests using sequences such as <span class="text-cyan-300">../</span> are rejected after canonical path validation if they resolve outside the sandbox.</p>
+</div>
+<div class="rounded-xl border border-slate-800 bg-slate-950 p-4">
+<div class="font-semibold text-slate-100 mb-2">Controlled writes</div>
+<p>Writes, overwrites, directory creation, and optional deletes only affect files beneath the allowed root.</p>
+</div>
+<div class="rounded-xl border border-slate-800 bg-slate-950 p-4">
+<div class="font-semibold text-slate-100 mb-2">Safe defaults</div>
+<p>The server includes input validation, structured responses, conservative file handling, and clear setup instructions.</p>
+</div>
+</div>
+</div>
+<div class="rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-xl">
+<div class="flex items-center gap-3 mb-4">
+<i aria-hidden="true" class="fas fa-list-check text-emerald-400"></i>
+<h2 class="text-xl font-semibold">Run instructions</h2>
+</div>
+<ol class="list-decimal list-inside space-y-2 text-sm text-slate-300">
+<li>Generate the server code below.</li>
+<li>Save it as <span class="text-cyan-300">server.js</span> in a local project folder.</li>
+<li>Run <span class="text-cyan-300">npm init -y</span>.</li>
+<li>Install the MCP SDK package shown in the generated header comments.</li>
+<li>Set the base folder environment variable or edit the constant in the file.</li>
+<li>Run the server locally with Node.js.</li>
+<li>Configure your MCP client to launch this local server.</li>
+</ol>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<script>
+      const els = {
+        serverName: document.getElementById('serverName'),
+        baseFolder: document.getElementById('baseFolder'),
+        allowDelete: document.getElementById('allowDelete'),
+        allowMkdir: document.getElementById('allowMkdir'),
+        generateBtn: document.getElementById('generateBtn'),
+        saveCsvBtn: document.getElementById('saveCsvBtn'),
+        codeOutput: document.getElementById('codeOutput'),
+        copyBtn: document.getElementById('copyBtn'),
+        downloadBtn: document.getElementById('downloadBtn'),
+        statusBox: document.getElementById('statusBox'),
+        heroImage: document.getElementById('heroImage'),
+        heroFallback: document.getElementById('heroFallback')
+      };
+
+      let generatedCode = '';
+      let lastSpec = null;
+      let lastAiNote = '';
+
+      if (els.heroImage) {
+        els.heroImage.addEventListener('error', () => {
+          els.heroImage.classList.add('hidden');
+          if (els.heroFallback) {
+            els.heroFallback.classList.remove('hidden');
+          }
+        });
+      }
+
+      function escapeHtml(str) {
+        return String(str)
+          .replaceAll('&', '&amp;')
+          .replaceAll('<', '&lt;')
+          .replaceAll('>', '&gt;');
+      }
+
+      function setStatus(message, type) {
+        const typeMap = {
+          success: 'border-emerald-700 bg-emerald-500/10 text-emerald-300',
+          error: 'border-red-700 bg-red-500/10 text-red-300',
+          info: 'border-cyan-700 bg-cyan-500/10 text-cyan-300',
+          warn: 'border-amber-700 bg-amber-500/10 text-amber-300'
+        };
+        els.statusBox.className = 'rounded-xl border px-4 py-3 text-sm ' + (typeMap[type] || typeMap.info);
+        els.statusBox.textContent = message;
+        els.statusBox.classList.remove('hidden');
+      }
+
+      function validateAbsolutePath(input) {
+        if (!input || typeof input !== 'string') return false;
+        const trimmed = input.trim();
+        if (!trimmed) return false;
+        if (trimmed.startsWith('/')) return true;
+        if (/^[A-Za-z]:[\\/]/.test(trimmed)) return true;
+        if (trimmed.startsWith('\\\\')) return true;
+        return false;
+      }
+
+      function buildServerCode(spec, aiNote) {
+        const deleteTool = spec.allowDelete ? `
+server.registerTool(
+  "delete_file",
+  {
+    description: "Delete a file",
+    inputSchema: z.object({
+      path: z.string().min(1)
+    })
+  },
+  async ({ path: userPath }) => {
+    try {
+      const targetPath = await resolveInsideBase(userPath);
+      const stat = await fs.stat(targetPath);
+      if (stat.isDirectory()) {
+        throw new Error("Refusing to delete a directory with delete_file");
+      }
+      await fs.unlink(targetPath);
+      return {
+        content: [{ type: "text", text: JSON.stringify({ ok: true, deleted: userPath }, null, 2) }]
+      };
+    } catch (error) {
+      return handleToolError("delete_file", error);
+    }
+  }
+);` : '';
+
+        const mkdirTool = spec.allowMkdir ? `
+server.registerTool(
+  "make_directory",
+  {
+    description: "Create a new directory",
+    inputSchema: z.object({
+      path: z.string().min(1)
+    })
+  },
+  async ({ path: userPath }) => {
+    try {
+      const targetPath = await resolveInsideBaseForWrite(userPath);
+      await fs.mkdir(targetPath, { recursive: true });
+      return {
+        content: [{ type: "text", text: JSON.stringify({ ok: true, directory: userPath }, null, 2) }]
+      };
+    } catch (error) {
+      return handleToolError("make_directory", error);
+    }
+  }
+);` : '';
+
+        return `#!/usr/bin/env node
+/**
+ * ${spec.serverName}
+ *
+ * Secure MCP filesystem server restricted to:
+ * ${spec.baseFolder}
+ *
+ * Setup:
+ *   npm init -y
+ *   npm install @modelcontextprotocol/sdk zod
+ *
+ * Run:
+ *   # stdio
+ *   BASE_DIR="${spec.baseFolder}" MCP_TRANSPORT="stdio" node server.js
+ *
+ *   # HTTP
+ *   BASE_DIR="${spec.baseFolder}" MCP_TRANSPORT="http" HTTP_HOST="127.0.0.1" HTTP_PORT="3000" HTTP_PATH="/mcp" node server.js
+ *
+ *   # both transports (default)
+ *   BASE_DIR="${spec.baseFolder}" MCP_TRANSPORT="both" HTTP_HOST="127.0.0.1" HTTP_PORT="3000" HTTP_PATH="/mcp" node server.js
+ *
+ * Security model:
+ *   - All paths must stay inside BASE_DIR
+ *   - Paths are normalized and resolved before access
+ *   - Parent traversal outside the base directory is rejected
+ *   - Symlink targets are checked when possible
+ *
+ * AI note:
+ *   ${aiNote || 'Generated without AI note.'}
+ */
+
+const fs = require("node:fs/promises");
+const path = require("node:path");
+const { existsSync } = require("node:fs");
+const { McpServer } = require("@modelcontextprotocol/sdk/server/mcp.js");
+const { StdioServerTransport } = require("@modelcontextprotocol/sdk/server/stdio.js");
+const { StreamableHTTPServerTransport } = require("@modelcontextprotocol/sdk/server/streamableHttp.js");
+const { createMcpExpressApp } = require("@modelcontextprotocol/sdk/server/express.js");
+const { z } = require("zod");
+
+const SERVER_NAME = "${spec.serverName}";
+const SERVER_VERSION = "1.0.0";
+const BASE_DIR_INPUT = process.env.BASE_DIR || ${JSON.stringify(spec.baseFolder)};
+const MCP_TRANSPORT = (process.env.MCP_TRANSPORT || "both").toLowerCase();
+const HTTP_HOST = process.env.HTTP_HOST || "127.0.0.1";
+const HTTP_PORT = Number.parseInt(process.env.HTTP_PORT || "3000", 10);
+const HTTP_PATH = process.env.HTTP_PATH || "/mcp";
+
+function assertValidBaseDir(baseDirInput) {
+  if (!baseDirInput || typeof baseDirInput !== "string") {
+    throw new Error("BASE_DIR must be a non-empty string");
+  }
+  const resolved = path.resolve(baseDirInput);
+  return resolved;
+}
+
+const BASE_DIR = assertValidBaseDir(BASE_DIR_INPUT);
+
+function isSubPath(parentPath, candidatePath) {
+  const relative = path.relative(parentPath, candidatePath);
+  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
+}
+
+async function realpathSafe(targetPath) {
+  try {
+    return await fs.realpath(targetPath);
+  } catch {
+    return path.resolve(targetPath);
+  }
+}
+
+function getEntryType(entry) {
+  if (entry.isDirectory()) {
+    return "directory";
+  }
+  if (entry.isFile()) {
+    return "file";
+  }
+  return "other";
+}
+
+async function ensureBaseDirExists() {
+  if (!existsSync(BASE_DIR)) {
+    throw new Error(\`Base directory does not exist: \${BASE_DIR}\`);
+  }
+  const stat = await fs.stat(BASE_DIR);
+  if (!stat.isDirectory()) {
+    throw new Error(\`Base path is not a directory: \${BASE_DIR}\`);
+  }
+}
+
+async function resolveInsideBase(userPath) {
+  if (!userPath || typeof userPath !== "string") {
+    throw new Error("Path must be a non-empty string");
+  }
+
+  const normalizedInput = userPath.replaceAll("\\", "/");
+  const joinedPath = path.resolve(BASE_DIR, normalizedInput);
+  const realBase = await realpathSafe(BASE_DIR);
+  const realCandidate = await realpathSafe(joinedPath);
+
+  if (!isSubPath(realBase, realCandidate)) {
+    throw new Error("Access denied: path resolves outside the allowed base directory");
+  }
+
+  return realCandidate;
+}
+
+async function resolveInsideBaseForWrite(userPath) {
+  if (!userPath || typeof userPath !== "string") {
+    throw new Error("Path must be a non-empty string");
+  }
+
+  const normalizedInput = userPath.replaceAll("\\", "/");
+  const joinedPath = path.resolve(BASE_DIR, normalizedInput);
+  const realBase = await realpathSafe(BASE_DIR);
+
+  const parentDir = path.dirname(joinedPath);
+  const realParent = await realpathSafe(parentDir);
+
+  if (!isSubPath(realBase, realParent)) {
+    throw new Error("Access denied: write target resolves outside the allowed base directory");
+  }
+
+  if (!isSubPath(realBase, path.resolve(joinedPath))) {
+    throw new Error("Access denied: invalid write path");
+  }
+
+  return path.resolve(joinedPath);
+}
+
+function handleToolError(toolName, error) {
+  const message = error instanceof Error ? error.message : String(error);
+  return {
+    content: [{ type: "text", text: JSON.stringify({ ok: false, tool: toolName, error: message }, null, 2) }],
+    isError: true
+  };
+}
+
+function registerTools(server) {
+server.registerTool(
+  "read_file",
+  {
+    description: "Read the contents of a file",
+    inputSchema: z.object({
+      path: z.string().min(1),
+      encoding: z.enum(["utf8", "base64"]).optional()
+    })
+  },
+  async ({ path: userPath, encoding }) => {
+    try {
+      const targetPath = await resolveInsideBase(userPath);
+      const content = await fs.readFile(targetPath, encoding === "base64" ? undefined : "utf8");
+      const result = encoding === "base64"
+        ? Buffer.from(content).toString("base64")
+        : content;
+      return {
+        content: [{ type: "text", text: JSON.stringify({ ok: true, path: userPath, content: result }, null, 2) }]
+      };
+    } catch (error) {
+      return handleToolError("read_file", error);
+    }
+  }
+);
+
+server.registerTool(
+  "write_file",
+  {
+    description: "Write content to a file",
+    inputSchema: z.object({
+      path: z.string().min(1),
+      content: z.string(),
+      overwrite: z.boolean().optional()
+    })
+  },
+  async ({ path: userPath, content, overwrite }) => {
+    try {
+      const targetPath = await resolveInsideBaseForWrite(userPath);
+      await fs.mkdir(path.dirname(targetPath), { recursive: true });
+
+      if (!overwrite) {
+        try {
+          await fs.access(targetPath);
+          throw new Error("Target file already exists and overwrite=false");
+        } catch (error) {
+          if (error?.message === "Target file already exists and overwrite=false") {
+            throw error;
+          }
+        }
+      }
+
+      await fs.writeFile(targetPath, content, "utf8");
+      return {
+        content: [{ type: "text", text: JSON.stringify({ ok: true, path: userPath, bytesWritten: Buffer.byteLength(content, "utf8") }, null, 2) }]
+      };
+    } catch (error) {
+      return handleToolError("write_file", error);
+    }
+  }
+);
+
+server.registerTool(
+  "list_directory",
+  {
+    description: "List the contents of a directory",
+    inputSchema: z.object({
+      path: z.string().optional()
+    })
+  },
+  async ({ path: userPath }) => {
+    try {
+      const targetPath = await resolveInsideBase(userPath || ".");
+      const entries = await fs.readdir(targetPath, { withFileTypes: true });
+      const result = entries.map((entry) => ({
+        name: entry.name,
+        type: getEntryType(entry)
+      }));
+      return {
+        content: [{ type: "text", text: JSON.stringify({ ok: true, path: userPath || ".", entries: result }, null, 2) }]
+      };
+    } catch (error) {
+      return handleToolError("list_directory", error);
+    }
+  }
+);${mkdirTool}
+
+${deleteTool}
+
+}
+
+function createServer() {
+  const server = new McpServer({
+    name: SERVER_NAME,
+    version: SERVER_VERSION
+  });
+  registerTools(server);
+  return server;
+}
+
+function getTransportMode() {
+  if (MCP_TRANSPORT !== "stdio" && MCP_TRANSPORT !== "http" && MCP_TRANSPORT !== "both") {
+    throw new Error('MCP_TRANSPORT must be one of: "stdio", "http", "both"');
+  }
+  return MCP_TRANSPORT;
+}
+
+async function startStdioServer() {
+  const server = createServer();
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+  console.error("MCP stdio transport connected");
+  return server;
+}
+
+async function startHttpServer() {
+  if (!Number.isInteger(HTTP_PORT) || HTTP_PORT < 1 || HTTP_PORT > 65535) {
+    throw new Error("HTTP_PORT must be a valid port number (1-65535)");
+  }
+
+  const app = createMcpExpressApp();
+
+  app.post(HTTP_PATH, async (req, res) => {
+    const requestServer = createServer();
+    const transport = new StreamableHTTPServerTransport({
+      sessionIdGenerator: undefined
+    });
+
+    try {
+      await requestServer.connect(transport);
+      await transport.handleRequest(req, res, req.body);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error("HTTP MCP request failed: " + message);
+      if (!res.headersSent) {
+        res.status(500).json({
+          jsonrpc: "2.0",
+          error: {
+            code: -32603,
+            message: "Internal server error"
+          },
+          id: null
+        });
+      }
+    } finally {
+      res.on("close", async () => {
+        try {
+          await transport.close();
+          await requestServer.close();
+        } catch {
+          // no-op on shutdown cleanup
+        }
+      });
+    }
+  });
+
+  app.get(HTTP_PATH, (_req, res) => {
+    res.status(405).json({
+      jsonrpc: "2.0",
+      error: {
+        code: -32000,
+        message: "Method not allowed. Use POST for MCP requests."
+      },
+      id: null
+    });
+  });
+
+  app.delete(HTTP_PATH, (_req, res) => {
+    res.status(405).json({
+      jsonrpc: "2.0",
+      error: {
+        code: -32000,
+        message: "Method not allowed."
+      },
+      id: null
+    });
+  });
+
+  return new Promise((resolve, reject) => {
+    const listener = app.listen(HTTP_PORT, HTTP_HOST, () => {
+      console.error("MCP HTTP transport listening at http://" + HTTP_HOST + ":" + HTTP_PORT + HTTP_PATH);
+      resolve(listener);
+    });
+    listener.on("error", reject);
+  });
+}
+
+async function main() {
+  await ensureBaseDirExists();
+  const mode = getTransportMode();
+
+  if (mode === "stdio" || mode === "both") {
+    await startStdioServer();
+  }
+
+  if (mode === "http" || mode === "both") {
+    await startHttpServer();
+  }
+}
+
+main().catch((error) => {
+  const message = error instanceof Error ? error.stack || error.message : String(error);
+  console.error(message);
+  process.exit(1);
+});
+`;
+      }
+
+      async function generateCode() {
+        const spec = {
+          serverName: (els.serverName.value || '').trim(),
+          baseFolder: (els.baseFolder.value || '').trim(),
+          allowDelete: !!els.allowDelete.checked,
+          allowMkdir: !!els.allowMkdir.checked
+        };
+
+        if (!spec.serverName) {
+          setStatus('Please enter a server name.', 'error');
+          return;
+        }
+
+        if (!validateAbsolutePath(spec.baseFolder)) {
+          setStatus('Please enter a valid absolute base folder path.', 'error');
+          return;
+        }
+
+        lastSpec = spec;
+        setStatus('Generating secure MCP server template...', 'info');
+
+        let aiNote = 'Static secure template generated.';
+        if (typeof globalThis.call_llm === 'function') {
+          try {
+            const res = await globalThis.call_llm(
+              'You are a secure systems engineer. Return a very short implementation note for a local MCP filesystem server template. Keep it under 30 words and mention sandboxed base-folder enforcement.',
+              [
+                {
+                  role: 'user',
+                  content: JSON.stringify({
+                    serverName: spec.serverName,
+                    baseFolder: spec.baseFolder,
+                    allowDelete: spec.allowDelete,
+                    allowMkdir: spec.allowMkdir
+                  })
+                }
+              ],
+              [{ note: 'Short implementation note under 30 words' }]
+            );
+            if (res && res.note) {
+              aiNote = String(res.note).trim();
+            }
+          } catch (error) {
+            console.error('AI note generation failed:', error);
+            aiNote = 'AI note unavailable; static secure template generated.';
+          }
+        }
+
+        lastAiNote = aiNote;
+        generatedCode = buildServerCode(spec, aiNote);
+        els.codeOutput.innerHTML = escapeHtml(generatedCode);
+        setStatus('The MCP server template was generated successfully.', 'success');
+      }
+
+      async function copyCode() {
+        if (!generatedCode) {
+          setStatus('Generate the code first.', 'warn');
+          return;
+        }
+        try {
+          await navigator.clipboard.writeText(generatedCode);
+          setStatus('Code copied to clipboard.', 'success');
+        } catch (error) {
+          console.error('Copy failed:', error);
+          setStatus('Copy failed. Please copy manually from the code block.', 'error');
+        }
+      }
+
+      function downloadCode() {
+        if (!generatedCode) {
+          setStatus('Generate the code first.', 'warn');
+          return;
+        }
+        try {
+          const blob = new Blob([generatedCode], { type: 'text/javascript;charset=utf-8' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'server.js';
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          URL.revokeObjectURL(url);
+          setStatus('server.js was downloaded.', 'success');
+        } catch (error) {
+          console.error('Download failed:', error);
+          setStatus('Download failed.', 'error');
+        }
+      }
+
+      function saveCsv() {
+        if (!lastSpec) {
+          setStatus('Generate the code before saving the spec.', 'warn');
+          return;
+        }
+
+        const row = [{
+          serverName: lastSpec.serverName,
+          baseFolder: lastSpec.baseFolder,
+          allowDelete: String(lastSpec.allowDelete),
+          allowMkdir: String(lastSpec.allowMkdir),
+          aiNote: lastAiNote
+        }];
+
+        try {
+          if (typeof globalThis.save_data_to_csv !== 'function') {
+            throw new TypeError('save_data_to_csv is unavailable');
+          }
+          globalThis.save_data_to_csv('mcp_server_spec.csv', row);
+          setStatus('The server specification was saved to CSV.', 'success');
+        } catch (error) {
+          console.error('Saving CSV failed:', error);
+          setStatus('Saving CSV failed.', 'error');
+        }
+      }
+
+      els.generateBtn.addEventListener('click', generateCode);
+      els.copyBtn.addEventListener('click', copyCode);
+      els.downloadBtn.addEventListener('click', downloadCode);
+      els.saveCsvBtn.addEventListener('click', saveCsv);
+
+      generateCode();
+  </script>
+</body>
+</html>
