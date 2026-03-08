@@ -16,6 +16,8 @@ A secure Model Context Protocol (MCP) server that provides sandboxed filesystem 
 - `read_file` - Read file contents (supports UTF-8 and base64 encoding)
 - `write_file` - Write content to files with optional overwrite protection
 - `list_directory` - List directory contents with type information
+- `stat_file` - Get metadata for a file or directory
+- `search_files` - Recursively search files by name
 - `make_directory` - Create directories recursively
 - `delete_file` - Delete files safely (refuses to delete directories)
 

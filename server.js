@@ -72,6 +72,78 @@ function getEntryType(entry) {
   return "other";
 }
 
+function getStatType(stat) {
+  if (stat.isDirectory()) {
+    return "directory";
+  }
+  if (stat.isFile()) {
+    return "file";
+  }
+  return "other";
+}
+
+function normalizeRelativePath(basePath, absolutePath) {
+  const relativePath = path.relative(basePath, absolutePath);
+  return relativePath.replaceAll("\\", "/") || ".";
+}
+
+function statToResult(userPath, absolutePath, stat) {
+  return {
+    ok: true,
+    path: userPath,
+    absolutePath,
+    type: getStatType(stat),
+    size: stat.size,
+    createdAt: stat.birthtime.toISOString(),
+    modifiedAt: stat.mtime.toISOString(),
+    accessedAt: stat.atime.toISOString()
+  };
+}
+
+async function findFilesRecursive(searchRoot, query, maxResults) {
+  const results = [];
+  const normalizedQuery = (query || "").toLowerCase();
+
+  async function visit(currentPath) {
+    if (results.length >= maxResults) {
+      return;
+    }
+
+    const entries = await fs.readdir(currentPath, { withFileTypes: true });
+    for (const entry of entries) {
+      if (results.length >= maxResults) {
+        break;
+      }
+
+      const absolutePath = path.join(currentPath, entry.name);
+      const entryType = getEntryType(entry);
+
+      if (entryType === "directory") {
+        await visit(absolutePath);
+        continue;
+      }
+
+      if (entryType !== "file") {
+        continue;
+      }
+
+      if (!normalizedQuery || entry.name.toLowerCase().includes(normalizedQuery)) {
+        const stat = await fs.stat(absolutePath);
+        results.push({
+          path: normalizeRelativePath(searchRoot, absolutePath),
+          absolutePath,
+          name: entry.name,
+          size: stat.size,
+          modifiedAt: stat.mtime.toISOString()
+        });
+      }
+    }
+  }
+
+  await visit(searchRoot);
+  return results;
+}
+
 async function ensureBaseDirExists() {
   if (!existsSync(BASE_DIR)) {
     throw new Error(`Base directory does not exist: ${BASE_DIR}`);
@@ -213,6 +285,66 @@ function registerTools(server) {
         };
       } catch (error) {
         return handleToolError("list_directory", error);
+      }
+    }
+  );
+
+  server.registerTool(
+    "stat_file",
+    {
+      description: "Get metadata for a file or directory",
+      inputSchema: z.object({
+        path: z.string().min(1)
+      })
+    },
+    async ({ path: userPath }) => {
+      try {
+        const targetPath = await resolveInsideBase(userPath);
+        const stat = await fs.stat(targetPath);
+        const result = statToResult(userPath, targetPath, stat);
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }]
+        };
+      } catch (error) {
+        return handleToolError("stat_file", error);
+      }
+    }
+  );
+
+  server.registerTool(
+    "search_files",
+    {
+      description: "Recursively search files by name within a directory",
+      inputSchema: z.object({
+        path: z.string().optional(),
+        query: z.string().optional(),
+        max_results: z.number().int().positive().max(1000).optional()
+      })
+    },
+    async ({ path: userPath, query, max_results: maxResults }) => {
+      try {
+        const targetPath = await resolveInsideBase(userPath || ".");
+        const stat = await fs.stat(targetPath);
+        if (!stat.isDirectory()) {
+          throw new Error("search_files path must be a directory");
+        }
+
+        const limit = maxResults || 100;
+        const matches = await findFilesRecursive(targetPath, query, limit);
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              ok: true,
+              path: userPath || ".",
+              query: query || "",
+              maxResults: limit,
+              results: matches
+            }, null, 2)
+          }]
+        };
+      } catch (error) {
+        return handleToolError("search_files", error);
       }
     }
   );
