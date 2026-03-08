@@ -37,7 +37,13 @@ const BASE_DIR_INPUT = process.env.BASE_DIR || "C:/mcp-sandbox/base";
 const MCP_TRANSPORT = (process.env.MCP_TRANSPORT || "both").toLowerCase();
 const HTTP_HOST = process.env.HTTP_HOST || "127.0.0.1";
 const HTTP_PORT = Number.parseInt(process.env.HTTP_PORT || "3000", 10);
-const HTTP_PATH = process.env.HTTP_PATH || "/mcp";
+const HTTP_PATH = process.env.HTTP_PATH || "/mcp/local-filesystem";
+const MCP_BEARER_TOKEN = process.env.MCP_BEARER_TOKEN || "";
+const HTTP_RATE_LIMIT_WINDOW_MS = Number.parseInt(process.env.HTTP_RATE_LIMIT_WINDOW_MS || "60000", 10);
+const HTTP_RATE_LIMIT_MAX_REQUESTS = Number.parseInt(process.env.HTTP_RATE_LIMIT_MAX_REQUESTS || "60", 10);
+const HTTP_REQUEST_LOGGING = (process.env.HTTP_REQUEST_LOGGING || "true").toLowerCase() !== "false";
+
+const httpRateLimitStore = new Map();
 
 function assertValidBaseDir(baseDirInput) {
   if (!baseDirInput || typeof baseDirInput !== "string") {
@@ -70,6 +76,91 @@ function getEntryType(entry) {
     return "file";
   }
   return "other";
+}
+
+function getClientAddress(req) {
+  const forwardedFor = req.headers["x-forwarded-for"];
+  if (typeof forwardedFor === "string" && forwardedFor.trim()) {
+    return forwardedFor.split(",")[0].trim();
+  }
+  return req.ip || req.socket?.remoteAddress || "unknown";
+}
+
+function isBearerAuthorized(req) {
+  if (!MCP_BEARER_TOKEN) {
+    return true;
+  }
+
+  const authHeader = req.headers.authorization;
+  if (typeof authHeader !== "string" || !authHeader.startsWith("Bearer ")) {
+    return false;
+  }
+
+  const providedToken = authHeader.slice("Bearer ".length).trim();
+  return Boolean(providedToken) && providedToken === MCP_BEARER_TOKEN;
+}
+
+function checkRateLimit(req) {
+  if (HTTP_RATE_LIMIT_MAX_REQUESTS <= 0 || HTTP_RATE_LIMIT_WINDOW_MS <= 0) {
+    return { allowed: true, remaining: null, resetAt: null };
+  }
+
+  const now = Date.now();
+  const key = getClientAddress(req);
+  const current = httpRateLimitStore.get(key);
+
+  if (!current || now >= current.resetAt) {
+    const next = {
+      count: 1,
+      resetAt: now + HTTP_RATE_LIMIT_WINDOW_MS
+    };
+    httpRateLimitStore.set(key, next);
+    return {
+      allowed: true,
+      remaining: HTTP_RATE_LIMIT_MAX_REQUESTS - 1,
+      resetAt: next.resetAt
+    };
+  }
+
+  if (current.count >= HTTP_RATE_LIMIT_MAX_REQUESTS) {
+    return {
+      allowed: false,
+      remaining: 0,
+      resetAt: current.resetAt
+    };
+  }
+
+  current.count += 1;
+  return {
+    allowed: true,
+    remaining: HTTP_RATE_LIMIT_MAX_REQUESTS - current.count,
+    resetAt: current.resetAt
+  };
+}
+
+function createRequestId() {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function logHttpRequest(req, requestId, startedAtMs, statusCode, details) {
+  if (!HTTP_REQUEST_LOGGING) {
+    return;
+  }
+
+  const durationMs = Date.now() - startedAtMs;
+  const suffix = details ? ` | ${details}` : "";
+  console.error(`[HTTP] ${requestId} ${req.method} ${req.path} ${statusCode} ${durationMs}ms | ip=${getClientAddress(req)}${suffix}`);
+}
+
+function sendJsonRpcHttpError(res, statusCode, code, message) {
+  res.status(statusCode).json({
+    jsonrpc: "2.0",
+    error: {
+      code,
+      message
+    },
+    id: null
+  });
 }
 
 function getStatType(stat) {
@@ -394,6 +485,49 @@ function registerTools(server) {
       }
     }
   );
+
+  server.registerTool(
+    "rename_file",
+    {
+      description: "Rename or move a file within the sandbox",
+      inputSchema: z.object({
+        from_path: z.string().min(1),
+        to_path: z.string().min(1),
+        overwrite: z.boolean().optional()
+      })
+    },
+    async ({ from_path: fromPath, to_path: toPath, overwrite }) => {
+      try {
+        const sourcePath = await resolveInsideBase(fromPath);
+        const destinationPath = await resolveInsideBaseForWrite(toPath);
+
+        const sourceStat = await fs.stat(sourcePath);
+        if (!sourceStat.isFile()) {
+          throw new Error("rename_file only supports files");
+        }
+
+        await fs.mkdir(path.dirname(destinationPath), { recursive: true });
+
+        if (!overwrite) {
+          try {
+            await fs.access(destinationPath);
+            throw new Error("Destination file already exists and overwrite=false");
+          } catch (error) {
+            if (error?.message === "Destination file already exists and overwrite=false") {
+              throw error;
+            }
+          }
+        }
+
+        await fs.rename(sourcePath, destinationPath);
+        return {
+          content: [{ type: "text", text: JSON.stringify({ ok: true, from: fromPath, to: toPath }, null, 2) }]
+        };
+      } catch (error) {
+        return handleToolError("rename_file", error);
+      }
+    }
+  );
 }
 
 function createServer() {
@@ -427,10 +561,54 @@ async function startHttpServer() {
 
   const app = createMcpExpressApp();
 
+  if (!MCP_BEARER_TOKEN) {
+    console.error("Warning: MCP_BEARER_TOKEN is not set. HTTP MCP endpoint is unauthenticated.");
+  }
+
   app.post(HTTP_PATH, async (req, res) => {
+    const requestId = createRequestId();
+    const startedAtMs = Date.now();
+
+    if (!isBearerAuthorized(req)) {
+      logHttpRequest(req, requestId, startedAtMs, 401, "auth=failed");
+      sendJsonRpcHttpError(res, 401, -32001, "Unauthorized: invalid or missing bearer token");
+      return;
+    }
+
+    const rate = checkRateLimit(req);
+    if (!rate.allowed) {
+      const retryAfterSeconds = Math.max(1, Math.ceil((rate.resetAt - Date.now()) / 1000));
+      res.setHeader("Retry-After", String(retryAfterSeconds));
+      logHttpRequest(req, requestId, startedAtMs, 429, "rate_limit=exceeded");
+      sendJsonRpcHttpError(res, 429, -32002, "Too many requests: rate limit exceeded");
+      return;
+    }
+
     const requestServer = createServer();
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined
+    });
+
+    let finalized = false;
+    const finalizeTransport = async () => {
+      if (finalized) {
+        return;
+      }
+      finalized = true;
+      try {
+        await transport.close();
+        await requestServer.close();
+      } catch {
+        // no-op on shutdown cleanup
+      }
+    };
+
+    res.on("finish", () => {
+      logHttpRequest(req, requestId, startedAtMs, res.statusCode, "auth=ok");
+    });
+
+    res.on("close", () => {
+      void finalizeTransport();
     });
 
     try {
@@ -440,24 +618,10 @@ async function startHttpServer() {
       const message = error instanceof Error ? error.message : String(error);
       console.error(`HTTP MCP request failed: ${message}`);
       if (!res.headersSent) {
-        res.status(500).json({
-          jsonrpc: "2.0",
-          error: {
-            code: -32603,
-            message: "Internal server error"
-          },
-          id: null
-        });
+        sendJsonRpcHttpError(res, 500, -32603, "Internal server error");
       }
     } finally {
-      res.on("close", async () => {
-        try {
-          await transport.close();
-          await requestServer.close();
-        } catch {
-          // no-op on shutdown cleanup
-        }
-      });
+      void finalizeTransport();
     }
   });
 

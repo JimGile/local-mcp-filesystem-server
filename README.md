@@ -20,6 +20,7 @@ A secure Model Context Protocol (MCP) server that provides sandboxed filesystem 
 - `search_files` - Recursively search files by name
 - `make_directory` - Create directories recursively
 - `delete_file` - Delete files safely (refuses to delete directories)
+- `rename_file` - Rename or move a file within the sandbox
 
 ## Installation
 
@@ -86,20 +87,102 @@ BASE_DIR="/path/to/your/sandbox" MCP_TRANSPORT="stdio" node server.js
 #### HTTP transport
 
 ```bash
-BASE_DIR="/path/to/your/sandbox" MCP_TRANSPORT="http" HTTP_HOST="127.0.0.1" HTTP_PORT="3000" HTTP_PATH="/mcp" node server.js
+BASE_DIR="/path/to/your/sandbox" MCP_TRANSPORT="http" HTTP_HOST="127.0.0.1" HTTP_PORT="3000" HTTP_PATH="/mcp/local-filesystem" node server.js
+```
+
+HTTP with bearer token enabled:
+
+```bash
+BASE_DIR="/path/to/your/sandbox" MCP_TRANSPORT="http" HTTP_HOST="127.0.0.1" HTTP_PORT="3000" HTTP_PATH="/mcp/local-filesystem" MCP_BEARER_TOKEN="replace-with-strong-token" node server.js
 ```
 
 Default HTTP endpoint:
 
 ```text
-http://127.0.0.1:3000/mcp
+http://127.0.0.1:3000/mcp/local-filesystem
 ```
 
 #### Both transports at once (default)
 
 ```bash
-BASE_DIR="/path/to/your/sandbox" MCP_TRANSPORT="both" HTTP_HOST="127.0.0.1" HTTP_PORT="3000" HTTP_PATH="/mcp" node server.js
+BASE_DIR="/path/to/your/sandbox" MCP_TRANSPORT="both" HTTP_HOST="127.0.0.1" HTTP_PORT="3000" HTTP_PATH="/mcp/local-filesystem" node server.js
 ```
+
+### Expose HTTP endpoint with tunneling (ngrok or Cloudflare)
+
+Use these options for temporary/ad-hoc external access.
+
+#### Option A: ngrok (free tier)
+
+1. Install ngrok and sign in.
+
+1. Configure your ngrok authtoken once:
+
+```bash
+ngrok config add-authtoken <YOUR_NGROK_AUTHTOKEN>
+```
+
+1. Start this MCP server in HTTP mode (or `both`) on localhost:
+
+```powershell
+$env:BASE_DIR="C:/mcp-sandbox/base"
+$env:MCP_TRANSPORT="http"
+$env:HTTP_HOST="127.0.0.1"
+$env:HTTP_PORT="3000"
+$env:HTTP_PATH="/mcp/local-filesystem"
+node server.js
+```
+
+1. In another terminal, start the ngrok tunnel script:
+
+```powershell
+.\Start-NgrokTunnel.ps1 -LocalHost "127.0.0.1" -LocalPort 3000 -HttpPath "/mcp/local-filesystem"
+```
+
+1. Copy the printed `MCP endpoint` URL into your MCP client.
+
+Example endpoint:
+
+```text
+https://<random-subdomain>.ngrok-free.app/mcp/local-filesystem
+```
+
+#### Option B: Cloudflare Tunnel (quick tunnel)
+
+1. Install `cloudflared`.
+
+1. Start this MCP server in HTTP mode (or `both`) on localhost:
+
+```powershell
+$env:BASE_DIR="C:/mcp-sandbox/base"
+$env:MCP_TRANSPORT="http"
+$env:HTTP_HOST="127.0.0.1"
+$env:HTTP_PORT="3000"
+$env:HTTP_PATH="/mcp/local-filesystem"
+node server.js
+```
+
+1. In another terminal, run a quick Cloudflare tunnel:
+
+```bash
+cloudflared tunnel --url http://127.0.0.1:3000
+```
+
+1. Copy the generated public URL from terminal output and append your MCP path.
+
+Example:
+
+```text
+Public URL from cloudflared: https://<random-subdomain>.trycloudflare.com
+MCP endpoint to use:         https://<random-subdomain>.trycloudflare.com/mcp/local-filesystem
+```
+
+Notes for both options:
+
+- Public URLs may change between sessions.
+- Keep `MCP_BEARER_TOKEN` enabled whenever exposing the endpoint.
+- Clients must send `Authorization: Bearer <token>` if bearer auth is enabled.
+- MCP requests must use `POST` to the configured `HTTP_PATH`.
 
 ### Using with Claude Desktop or Other MCP Clients
 
@@ -166,6 +249,12 @@ All operations are restricted to the configured `BASE_DIR`:
 - **Parent Traversal Protection**: Attempts to access outside the base directory are rejected
 - **Symlink Checking**: Symlink targets are verified when possible
 - **Real Path Resolution**: Uses `fs.realpath()` to resolve actual filesystem paths
+
+### HTTP Security Controls
+
+- **Bearer Token Auth**: Set `MCP_BEARER_TOKEN` to require `Authorization: Bearer <token>`
+- **Rate Limiting**: Configurable request limits per client IP
+- **Request Logging**: HTTP requests include method/path/status/duration/ip logs
 
 ### Security Model
 
@@ -268,7 +357,11 @@ Response:
 | `MCP_TRANSPORT` | Transport mode: `stdio`, `http`, or `both` | `both` | No |
 | `HTTP_HOST` | HTTP bind host when HTTP is enabled | `127.0.0.1` | No |
 | `HTTP_PORT` | HTTP port when HTTP is enabled | `3000` | No |
-| `HTTP_PATH` | MCP HTTP route path | `/mcp` | No |
+| `HTTP_PATH` | MCP HTTP route path | `/mcp/local-filesystem` | No |
+| `MCP_BEARER_TOKEN` | Required bearer token for HTTP requests (when set) | _empty_ | No |
+| `HTTP_RATE_LIMIT_WINDOW_MS` | HTTP rate limit window in milliseconds | `60000` | No |
+| `HTTP_RATE_LIMIT_MAX_REQUESTS` | Max HTTP requests per client per window | `60` | No |
+| `HTTP_REQUEST_LOGGING` | Enable HTTP request logging (`true`/`false`) | `true` | No |
 
 ### Server Constants
 
@@ -286,6 +379,8 @@ const SERVER_VERSION = "1.0.0";
 ```text
 local-mcp-filesystem-server/
 ├── server.js              # Main MCP server implementation
+├── Start-LocalMcpFilesystemServer.ps1   # Local server launcher
+├── Start-NgrokTunnel.ps1   # Temporary ngrok tunnel launcher
 ├── package.json           # Project dependencies and metadata
 ├── README.md              # This file
 └── generator/             # Interactive generator tool

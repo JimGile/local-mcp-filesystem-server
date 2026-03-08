@@ -172,19 +172,19 @@ async function validateHttpMode(serverPath, baseDir, mode) {
     MCP_TRANSPORT: mode,
     HTTP_HOST: "127.0.0.1",
     HTTP_PORT: String(port),
-    HTTP_PATH: "/mcp"
+    HTTP_PATH: "/mcp/local-filesystem"
   });
 
   try {
-    await waitForPattern(state, /MCP HTTP transport listening at http:\/\/127\.0\.0\.1:\d+\/mcp/, 4000);
+    await waitForPattern(state, /MCP HTTP transport listening at http:\/\/127\.0\.0\.1:\d+\/mcp\/local-filesystem/, 4000);
 
     if (mode === "both") {
       await waitForPattern(state, /MCP stdio transport connected/, 2000);
     }
 
-    const status = await httpGetStatus(`http://127.0.0.1:${port}/mcp`);
+    const status = await httpGetStatus(`http://127.0.0.1:${port}/mcp/local-filesystem`);
     if (status !== 405) {
-      throw new Error(`Expected HTTP GET /mcp to return 405, received ${status}`);
+      throw new Error(`Expected HTTP GET /mcp/local-filesystem to return 405, received ${status}`);
     }
 
     if (state.exited) {
